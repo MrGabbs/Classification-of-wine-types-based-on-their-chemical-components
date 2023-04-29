@@ -1,0 +1,484 @@
+---
+title: "Report for Final Project Task 2"
+author: "Gabriel Afriyie and Ranveer Kaur"
+date: "14/03/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\section{Abstract}
+
+Classification can be considered as an estimation of sets, where the risk is defined by means of a specific distance between sets associated with misclassification error. This project develops different classification techniques for the wine data. It presents Linear and Quadratic Discriminant Analysis, K-Nearest Neighbourhood, Classification trees and Support Vector Machine algorithms to predict the type of wine based on their chemical analysis. The best method after prediction is selected based on misclassification error. In particular, this project addresses the following questions: Does the selected method perform better than others? Do you think the classifier is safe enough to guarantee high accuracy in prediction? Are all inputs relevant? Ultimately, the Quadratic Discriminant Analysis classifier is selected as the best among the others.  
+
+\section{Introduction}
+
+Classification is the process of predicting the class of given data points. This process belongs to the category of supervised learning where the targets are also provided with the input data. In this project, we will use a number of different supervised algorithms to predict the type of wine using data containing the results of chemical analysis of wines grown in an area in Italy.
+
+\ The best candidate algorithm will be chosen based on their misclassification errors. Our main goal is to build a classifier that accurately predicts the type of wine based on their chemical components. This sort of task can arise in wine manufacturing companies, where manufacturers try to find the attributes of a particular type of wine to use that in creating new varieties.
+
+\subsection{Data}
+
+
+The dataset for this project originates from the UCI Machine Learning Repository. Three types of wine are represented in the 178 samples, with the results of 13 chemical analyses recorded for each sample. The Type variable has been transformed into a categoric variable.
+
+The data contains no missing values and consits of only numeric data, with a three class target variable (Type) for classification.
+
+\subsubsection{Predictor Variables}
+
+\begin{itemize}
+\item \textit{Alcohol}: Alcohol
+\item \textit{Malic}: Malic acid
+\item \textit{Ash}: Ash
+\item \textit{Alcalinity}: Alcalinity of ash
+\item \textit{Magnesium}: Magnesium
+\item \textit{Phenols}: Total phenols
+\item \textit{Flavanoids}: Flavanoids
+\item \textit{Nonflavanoids}: Nonflavanoid phenols
+\item \textit{Proanthocyanins}: Proanthocyanins
+\item \textit{Colour}: Colour intensity
+\item \textit{Hue}: Hue
+\item \textit{Dilution}: D280/OD315 of diluted wines
+\item \textit{Proline}: Proline
+\end{itemize}
+
+\subsubsection{Target Variable}
+
+\textit{Type}: The type of wine, into one of three classes, 1 (59 observations), 2(71 observations), and 3 (48 observations).
+
+
+\section{Import Libraries and Load Data}
+
+We will first load the libraries that we are going to use, as well as the wine data. The first column will be our target variable, ‘Type’, and the rest will be the predictor variables.
+
+```{r, warning=FALSE, message=FALSE}
+library(rattle)
+library(ggplot2)
+library(caret)
+library(MASS)
+library(gridExtra)
+library(grid)
+library(e1071)
+attach(wine)
+library(creditmodel)
+library(ROCR)
+library(tree)
+library(rpart.plot)
+```
+
+\section{Splitting the Dataset}
+
+We split the dataset into training data ($80\%$) and test data ($20\%$). We fit the models on the training data and test our models’ prediction on the test data.
+
+ 
+```{r, warning=FALSE, message=FALSE}
+set.seed(1)
+datasplit = train_test_split(wine, prop = 0.8, split_type = "Random")
+Wine.training = datasplit$train
+Wine.test = datasplit$test
+```
+
+\section{Exploratory Data Analysis}
+
+An initial exploration of the dataset will show us how many observations fit in each group and the distributions of the target variable with respect to each predictor variable. We can review the density distribution of each variable broken down by class value. Like the scatterplot matrix, the density plot by class can help see the separation of classes. It can also help to understand the overlap in class values for a variable.
+
+```{r, warning=FALSE, message=FALSE}
+plot(Type, col = c("Blue","green","pink"))
+x = wine[,2:14]
+y = wine[,1]
+scales = list(x=list(relation="free"), y=list(relation="free"))
+featurePlot(x=x, y=y, "density", scales = scales)
+```
+
+Notice the shape of the data, most variables exhibit a normal distribution.
+
+```{r, warning=FALSE, message=FALSE}
+HisAl <- ggplot(data=wine, aes(x=Alcohol))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Alcohol") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Alcohol")+
+  geom_vline(data=wine, aes(xintercept = mean(Alcohol)),linetype="dashed",color="grey")
+
+HisMa <- ggplot(data=wine, aes(x=Malic))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Malic acid") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Malic acid")+
+  geom_vline(data=wine, aes(xintercept = mean(Malic)),linetype="dashed",color="grey")
+
+HisAsh <- ggplot(data=wine, aes(x=Ash))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Ash") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Ash")+
+  geom_vline(data=wine, aes(xintercept = mean(Ash)),linetype="dashed",color="grey")
+
+HisAlca <- ggplot(data=wine, aes(x=Alcalinity))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Alcalinity of ash") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Alcalinity of ash")+
+  geom_vline(data=wine, aes(xintercept = mean(Alcalinity)),linetype="dashed",color="grey")
+
+
+# Plot all visualizations
+grid.arrange(HisAl + ggtitle(""),
+             HisMa + ggtitle(""),
+             HisAsh + ggtitle(""),
+             HisAlca  + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Wine Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+
+
+HisPl <- ggplot(data=wine, aes(x=Proline))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Proline") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Proline")+
+  geom_vline(data=wine, aes(xintercept = mean(Proline)),linetype="dashed",color="grey")
+
+HisPh <- ggplot(data=wine, aes(x=Phenols))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Total phenols") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Total phenols")+
+  geom_vline(data=wine, aes(xintercept = mean(Phenols)),linetype="dashed",color="grey")
+
+HisFl <- ggplot(data=wine, aes(x=Flavanoids))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Flavanoids") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Flavanoids")+
+  geom_vline(data=wine, aes(xintercept = mean(Flavanoids)),linetype="dashed",color="grey")
+
+HisNonFl <- ggplot(data=wine, aes(x=Nonflavanoids))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Nonflavanoid phenols") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Nonflavanoid phenols")+
+  geom_vline(data=wine, aes(xintercept = mean(Nonflavanoids)),linetype="dashed",color="grey")
+
+# Plot all visualizations
+grid.arrange(HisPl + ggtitle(""),
+             HisPh + ggtitle(""),
+             HisFl + ggtitle(""),
+             HisNonFl  + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Wine Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+
+
+HisPr <- ggplot(data=wine, aes(x=Proanthocyanins))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Proanthocyanins") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Proanthocyanins")+
+  geom_vline(data=wine, aes(xintercept = mean(Proanthocyanins)),linetype="dashed",color="grey")
+
+HisCol <- ggplot(data=wine, aes(x=Color))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Color intensity") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Color intensity")+
+  geom_vline(data=wine, aes(xintercept = mean(Color)),linetype="dashed",color="grey")
+
+HisHue <- ggplot(data=wine, aes(x=Hue))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Hue") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Hue")+
+  geom_vline(data=wine, aes(xintercept = mean(Hue)),linetype="dashed",color="grey")
+
+HisDi <- ggplot(data=wine, aes(x=Dilution))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Type)) + 
+  xlab("Dilution") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Dilution")+
+  geom_vline(data=wine, aes(xintercept = mean(Dilution)),linetype="dashed",color="grey")
+
+# Plot all visualizations
+grid.arrange(HisPr + ggtitle(""),
+             HisCol + ggtitle(""),
+             HisHue + ggtitle(""),
+             HisDi  + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Wine Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+```
+
+Next with the boxplots, we will identify some outliers. As we see below, some classes do not overlap at all (e.g. Alcohol), where as with other variables, they are hard to tear apart (Alcalinity of Ash).
+
+```{r, warning=FALSE, message=FALSE}
+# Let's plot all the variables in a single visualization that will contain all the boxplots
+
+BpAl <- ggplot(wine, aes(Type, Alcohol, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Alcohol", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpMa <- ggplot(wine, aes(Type, Malic, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Malic", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpAsh <- ggplot(wine, aes(Type, Ash, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Ash", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpAlc <- ggplot(wine, aes(Type, Alcalinity, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Alcalinity of ash", breaks= seq(0,30, by=2))+
+        theme(legend.position="none")
+
+# Plot all visualizations
+grid.arrange(BpAl  + ggtitle(""),
+             BpMa  + ggtitle(""),
+             BpAsh + ggtitle(""),
+             BpAlc + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Box Plot", 
+                            gp=gpar(fontsize=15))
+)             
+
+BpMag <- ggplot(wine, aes(Type, Magnesium, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Magnesium", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpPh <- ggplot(wine, aes(Type, Phenols, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Total phenols", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpFl <- ggplot(wine, aes(Type, Flavanoids, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Flavanoids", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpNonFl <- ggplot(wine, aes(Type, Nonflavanoids, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Nonflavanoid phenols", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+# Plot all visualizations
+grid.arrange(BpMag  + ggtitle(""),
+             BpPh  + ggtitle(""),
+             BpFl + ggtitle(""),
+             BpNonFl + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Box Plot", 
+                            gp=gpar(fontsize=15))
+)
+
+BpPr <- ggplot(wine, aes(Type, Proanthocyanins, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Proanthocyanins", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpCol <- ggplot(wine, aes(Type, Color, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Color intensity", breaks= seq(0,30, by=2))+
+        theme(legend.position="none")
+
+BpHue <- ggplot(wine, aes(Type, Hue, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Hue", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+BpDi <- ggplot(wine, aes(Type, Dilution, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Dilution", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+# Plot all visualizations
+
+grid.arrange(BpPr  + ggtitle(""),
+             BpCol  + ggtitle(""),
+             BpHue + ggtitle(""),
+             BpDi + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Box Plot", 
+                            gp=gpar(fontsize=15))
+)
+
+BpPro <- ggplot(wine, aes(Type, Proline, fill=Type)) + 
+        geom_boxplot()+
+        scale_y_continuous("Proline", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+BpPro
+
+```
+
+\section{Model’s Performance Evaluation}
+
+In this section, we will study $5$ different algorithms and determine the  best in terms of predicting our data. We will consider:
+
+\begin{itemize}
+\item Linear Discriminant Analysis (LDA)
+\item Quadratic Discriminant Analysis (QDA)
+\item K-Nearest Neighbourhood (KNN)
+\item Classification Trees 
+\item Support Vector Machines (SVM)
+\end{itemize}
+
+\subsection{LDA}
+
+
+```{r, warning=FALSE, message=FALSE}
+#building the LDA model of wine using Training Set
+ldafit = lda(Type~., data = Wine.training)
+ldafit
+
+#predict the test set using the LDA model
+preds = predict(ldafit, Wine.test)
+
+#evaluating the misclassification error rate
+lda.class=preds$class
+classtype = Wine.test$Type
+table(lda.class, classtype)
+mean(lda.class!=classtype)
+```
+
+From the result, we know that LDA predict test set well with a misclassification rate of $2.78\%$.
+
+\subsection{QDA}
+
+```{r, warning=FALSE, message=FALSE}
+#building the QDA model of wine using Training Set
+qda.fit=qda(Type~.,data=Wine.training)
+qda.fit
+
+#predict the test set using the QDA model
+qdapreds=predict(qda.fit,Wine.test)
+
+#evaluating the misclassification error rate
+qda.class = qdapreds$class
+testclass = Wine.test$Type
+table(qda.class,testclass)
+mean(qda.class!=testclass)
+```
+QDA perfectly predicts the test set with no misclassification.
+
+
+\subsection{KNN}
+We fit different KNN models with different values of $k=1, \dots,10$. For the sake of simplicity, we present the case with the least misclassification rate after prediction.
+ 
+```{r, warning=FALSE, message=FALSE}
+#building the KNN model (with k=1) of wine using Training Set and predicting the test set.
+library(class)
+train.X = data.frame(Wine.training[,2:14])
+test.X = data.frame(Wine.test[,2:14])
+knnpred = knn(train.X, test.X, Wine.training$Type, k=1)
+
+#evaluating the misclassification error rate
+table(knnpred, Wine.test$Type )
+mean(knnpred!=Wine.test$Type)
+```
+
+The misclassication rate for KNN with $k=1$ is $22.2\%$. KNN poorly predicts the test set. This is evidence that KNN is effective when the training data is large.
+
+\subsection{Classification Trees}
+
+Decision trees are intuitively very easy to explain. We predict that each observation belongs to the most commonly class of training observations in the region to which it belongs. We now fit the classification tree model.
+
+```{r, warning=FALSE, message=FALSE}
+#building the classification tree model of wine using Training Set
+tree.wine =tree(Type~., Wine.training )
+summary(tree.wine)
+
+#plot the tree
+plot(tree.wine)
+text(tree.wine,pretty =0)
+
+#predict on test set
+tree.pred=predict (tree.wine, Wine.test ,type ="class")
+table(tree.pred ,Wine.test$Type)
+mean(tree.pred!=Wine.test$Type)
+```
+
+The following variables are involved: Flavanoids, Color, Proline, Alcohol. There are $6$ terminal nodes. The residual mean deviance is $0.0863$ and the misclassification error rate on the training data is $2.11\%$. After predicting on the test set, we obtain a misclassification error rate of $2.78\%$. This is, as expected higher than that for the training set. Plotting helps us to visualize well the tree.
+
+
+\subsection{Support Vector Machines}
+
+For our wine dataset, we will build a linear SVM classifier to fit a model to predit types of wine. The classifier is built by performing ten-fold cross-validation to compare SVMs with linear kernel, using a range of values of the cost parameter (c).    
+
+```{r, warning=FALSE, message=FALSE}
+#SVM with linear kernel with different values of c.
+set.seed(111)
+tune_out3 = tune(svm,
+Type~.,
+data = Wine.training,
+kernel = "linear",
+ranges = list(cost = c(0.001, 0.01, 0.1, 1,5,10,100)))
+
+summary(tune_out3)
+```
+
+For the SVM with a linear kernel, the cost paramter, $c=0.01$ produces the SVM with the smallest cross validation error ($0.02095238$). We can then select the best model and use it for predictions on the test set.
+
+```{r, warning=FALSE, message=FALSE}
+#selecting the best model
+best_model3 = tune_out3$best.model
+best_model3
+
+#predicting on the test data
+svm.pred1 = predict(best_model3, newdata = Wine.test, decision.values = TRUE)
+
+conf.mat.svm1 = table(Wine.test$Type,svm.pred1)
+conf.mat.svm1
+
+mean(svm.pred1!=Wine.test$Type)
+
+```
+
+There are $90$ support vectors and no misclassification. Other kernels (polynomial and radial) were considered but since the linear kernels perform better, we decide to omit those cases.
+
+
+\section{Model Selection}
+
+Based on the misclassification error rates, the QDA and Linear SVM classifiers are the best candidates. To select the best between the best, we perform cross validation for QDA and compare the error to the already calculated cross validation error for linear SVM. 
+
+```{r, warning=FALSE, message=FALSE}
+K = 10
+folds2 = cut(seq(1,nrow(Wine.training)), breaks = K, labels = FALSE)
+set.seed(1)
+cv.qda2 = sapply(1:K, FUN = function(i){
+  testid2 = which(folds2 == i, arr.ind = TRUE)
+  Test2 = Wine.training[testid2,]
+  Train2 = Wine.training[-testid2,]
+  qda.fit=qda(Type~.,data=Wine.training)
+  qdapreds=predict(qda.fit,Wine.test)
+  cv.est.qda2 = mean(qdapreds$class!=Wine.test$Type)
+  return(cv.est.qda2)
+})
+mean(cv.qda2)
+```
+
+Comparing the errors, we find that QDA is the best model and the QDA classifier is best to predict the type of wine.
+
+\section{Conclusion}
+
+Throughout this project, we developed different classification models by using the training set of the wine data. The target variable in question is the type of wine, with $3$ classes. We considered a set of classifiers that perform well in multi-class predictions. After predicting the test set, the QDA and linear SVM performed best, with no misclassifications. We select QDA because it produced the lowest cv error. There are other ways to check the accuracy of a classifier, such calculating the specificity and sensitivity, AUc and classification accuracy of the classification model.
+
+
